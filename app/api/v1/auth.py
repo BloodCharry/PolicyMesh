@@ -1,3 +1,4 @@
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -94,3 +95,13 @@ async def login(
     refresh_token = AuthService.create_refresh_token(payload)
 
     return TokenResponse(access_token=access_token, refresh_token=refresh_token)
+
+
+@router.post("/logout")
+async def logout() -> dict[str, str]:
+    """
+    Выход из системы.
+    Так как мы используем JWT (Stateless), сервер не хранит сессию.
+    Клиент должен сам удалить токен из LocalStorage/Cookies.
+    """
+    return {"detail": "Logout successful. Please remove token from client storage."}
