@@ -37,7 +37,7 @@ async def delete_profile(request: Request, db: AsyncSession = Depends(get_db)) -
 
     user.is_active = False
 
-    # Мы добавляем user в текущую сессию, чтобы SQLAlchemy отследил изменения
+    # добавляем user в текущую сессию, чтобы SQLAlchemy отследил изменения
     db.add(user)
     await db.commit()
 

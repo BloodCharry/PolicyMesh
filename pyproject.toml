@@ -56,7 +56,8 @@ target-version = "py312"
 [tool.ruff.lint]
 select = ["E", "W", "F", "I", "B", "C4", "UP", "TCH"]
 ignore = ["E501",
-    "B008", ]
+    "B008",
+    "TC001"]
 fixable = ["ALL"]
 unfixable = []
 
