@@ -2,8 +2,11 @@ from fastapi import FastAPI
 
 from app.api.v1 import auth, users
 from app.core.config import settings
+from app.middleware.authentication import AuthMiddleware
 
 app = FastAPI(title=settings.PROJECT_NAME)
+
+app.add_middleware(AuthMiddleware)
 
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
 app.include_router(users.router, prefix="/api/v1/users", tags=["Users"])
