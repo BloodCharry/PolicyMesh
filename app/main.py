@@ -1,8 +1,11 @@
 from fastapi import FastAPI
 
+from app.api.v1 import auth
 from app.core.config import settings
 
 app = FastAPI(title=settings.PROJECT_NAME)
+
+app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
 
 
 @app.get("/health")
