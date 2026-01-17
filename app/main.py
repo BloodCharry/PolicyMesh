@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.api.v1 import auth, users
+from app.api.v1 import auth, mock, users
 from app.core.config import settings
 from app.core.exceptions import (
     general_exception_handler,
@@ -24,6 +24,7 @@ app.add_exception_handler(Exception, general_exception_handler)
 # Routers
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
 app.include_router(users.router, prefix="/api/v1/users", tags=["Users"])
+app.include_router(mock.router, prefix="/api/v1/mock-orders", tags=["Mock Orders"])
 
 
 @app.get("/health")
