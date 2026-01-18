@@ -1,0 +1,35 @@
+erDiagram
+    USERS ||--|| ROLES : has
+    ROLES ||--|{ ACCESS_ROLES_RULES : defines
+    BUSINESS_ELEMENTS ||--|{ ACCESS_ROLES_RULES : target_of
+
+    USERS {
+        int id PK
+        string email
+        string hashed_password
+        bool is_active
+        int role_id FK
+    }
+
+    ROLES {
+        int id PK
+        string name "Admin, User, etc."
+    }
+
+    BUSINESS_ELEMENTS {
+        int id PK
+        string key "orders, reports"
+        string name
+    }
+
+    ACCESS_ROLES_RULES {
+        int id PK
+        int role_id FK
+        int element_id FK
+        bool create_permission
+        bool read_permission
+        bool read_all_permission
+        bool update_permission
+        bool delete_permission
+        bool delete_all_permission
+    }

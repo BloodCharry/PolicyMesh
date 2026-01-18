@@ -1,17 +1,19 @@
-.PHONY: help install run dev test lint format type-check seed db-upgrade clean
+.PHONY: help install run dev test lint format type-check seed db-upgrade clean infra
 
 help:
 	@echo "Available commands:"
-	@echo "  install       - Install dependencies (Poetry)"
-	@echo "  run           - Run the app (uvicorn)"
-	@echo "  dev           - Run with auto-reload"
-	@echo "  test          - Run tests"
-	@echo "  lint          - Run ruff linter"
-	@echo "  format        - Format code with black + ruff"
-	@echo "  type-check    - Run mypy"
-	@echo "  seed          - Seed database with initial data"
-	@echo "  db-upgrade    - Run Alembic migrations"
-	@echo "  clean         - Remove cache and temporary files"
+	@echo "  make install       - Install dependencies (Poetry)"
+	@echo "  make run           - Run the app (uvicorn)"
+	@echo "  make dev           - Run with auto-reload"
+	@echo "  make test          - Run tests"
+	@echo "  make lint          - Run ruff linter"
+	@echo "  make format        - Format code with black + ruff"
+	@echo "  make type-check    - Run mypy"
+	@echo "  make seed          - Seed database with initial data"
+	@echo "  make db-upgrade    - Run Alembic migrations"
+	@echo "  make infra         - Start dev infrastructure (PostgreSQL via Docker)"
+	@echo "  make stop-dev      - Stop dev infrastructure (PostgreSQL via Docker)"
+	@echo "  make clean         - Remove cache and temporary files"
 
 install:
 	poetry install
@@ -40,6 +42,12 @@ seed:
 
 db-upgrade:
 	poetry run alembic upgrade head
+
+infra:
+	docker-compose --env-file .env.dev -f docker/docker-compose-dev.yml up -d
+
+stop-dev:
+	docker-compose --env-file .env.dev -f docker/docker-compose-dev.yml down
 
 clean:
 	find . -type d -name '__pycache__' -delete

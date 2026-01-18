@@ -1,0 +1,36 @@
+sequenceDiagram
+    participant Client
+    participant Middleware
+    participant Database
+    participant Endpoint (Dependency)
+    participant PermissionService
+
+    Client->>Middleware: Request + Header "Bearer <token>"
+
+    rect rgb(240, 240, 240)
+        Note over Middleware: 1. Authentication
+        Middleware->>Middleware: Decode JWT
+        Middleware->>Database: Fetch User + Role + Rules
+        Database-->>Middleware: User Object
+        Middleware->>Middleware: Check is_active
+        Middleware->>Endpoint: request.state.user = User
+    end
+
+    rect rgb(220, 240, 255)
+        Note over Endpoint (Dependency): 2. Authorization
+        Endpoint (Dependency)->>Endpoint (Dependency): Check if Rules exist in User.Role.Rules
+
+        alt No Rules found
+            Endpoint (Dependency)-->>Client: 403 Forbidden
+        else Rules Found
+             Endpoint (Dependency)->>Endpoint (Dependency): Check Boolean Flags (e.g. create=True)
+        end
+    end
+
+    rect rgb(220, 255, 220)
+        Note over PermissionService: 3. Business Logic (Ownership)
+        Endpoint (Dependency)->>PermissionService: Check Ownership (if needed)
+        PermissionService->>PermissionService: if not read_all: check user.id == item.owner_id
+    end
+
+    PermissionService-->>Client: 200 OK (Response Data)
