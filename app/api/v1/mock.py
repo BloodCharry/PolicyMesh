@@ -1,3 +1,4 @@
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -5,6 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import RequirePermission
 from app.db.session import get_db
 from app.services.permission_ops import PermissionService
+
+logger = structlog.get_logger()
 
 router = APIRouter()
 
@@ -43,6 +46,11 @@ async def create_order(
     new_id = len(MOCK_ORDERS) + 1
     new_order = Order(id=new_id, title=title, owner_id=user.id)
     MOCK_ORDERS.append(new_order)
+
+    logger.info(
+        "Order created (mock)", order_id=new_order.id, user_id=user.id, title=title
+    )
+
     return new_order
 
 
@@ -64,6 +72,9 @@ async def delete_order(
     # Найти заказ
     order = next((o for o in MOCK_ORDERS if o.id == order_id), None)
     if not order:
+        logger.warning(
+            "Order not found for deletion", order_id=order_id, user_id=user.id
+        )
         raise HTTPException(status_code=404, detail="Order not found")
 
     # Доп. проверка прав
@@ -73,9 +84,16 @@ async def delete_order(
     )
 
     if not has_perm:
+        logger.warning(
+            "Access denied: insufficient permissions for order deletion",
+            user_id=user.id,
+            order_id=order_id,
+            owner_id=order.owner_id,
+        )
         raise HTTPException(status_code=403, detail="Forbidden by logic")
 
     MOCK_ORDERS.remove(order)
+    logger.info("Order deleted (mock)", order_id=order_id, user_id=user.id)
     return None
 
 
@@ -96,6 +114,9 @@ async def get_order(
 
     order = next((o for o in MOCK_ORDERS if o.id == order_id), None)
     if not order:
+        logger.warning(
+            "Order not found for reading", order_id=order_id, user_id=user.id
+        )
         raise HTTPException(status_code=404, detail="Order not found")
 
     #  Проверка ВЛАДЕНИЯ (User vs Admin)
@@ -106,8 +127,14 @@ async def get_order(
     )
 
     if not has_perm:
+        logger.warning(
+            "Access denied: insufficient permissions for order reading",
+            user_id=user.id,
+            order_id=order_id,
+            owner_id=order.owner_id,
+        )
         raise HTTPException(
             status_code=403, detail="You do not have access to this order"
         )
-
+    logger.debug("Order retrieved (mock)", order_id=order_id, user_id=user.id)
     return order

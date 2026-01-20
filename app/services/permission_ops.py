@@ -1,8 +1,11 @@
+import structlog
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.rbac import AccessRolesRules, BusinessElement
 from app.models.users import User
+
+logger = structlog.get_logger()
 
 
 class PermissionService:
@@ -25,6 +28,12 @@ class PermissionService:
 
         # Если пользователь неактивен — отказ сразу
         if not user.is_active:
+            logger.warning(
+                "Permission denied: inactive user",
+                user_id=user.id,
+                resource=resource_key,
+                action=action,
+            )
             return False
 
         # Поиск правила для роли пользователя и конкретного ресурса
@@ -43,6 +52,13 @@ class PermissionService:
 
         # Если правила нет в БД — доступ запрещен
         if not rule:
+            logger.warning(
+                "Permission denied: no RBAC rule found",
+                user_id=user.id,
+                role_id=user.role_id,
+                resource=resource_key,
+                action=action,
+            )
             return False
 
         # Логика проверки прав
@@ -76,4 +92,10 @@ class PermissionService:
                 return False
 
             case _:
+                logger.error(
+                    "Unknown action in permission check",
+                    action=action,
+                    resource=resource_key,
+                    user_id=user.id,
+                )
                 return False

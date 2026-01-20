@@ -1,3 +1,4 @@
+import structlog
 from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -5,6 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db
 from app.models.rbac import AccessRolesRules, BusinessElement
 from app.models.users import User
+
+logger = structlog.get_logger()
 
 
 class RequirePermission:
@@ -25,6 +28,12 @@ class RequirePermission:
 
         # Если Middleware не нашел юзера то возрат 401.
         if not user:
+            logger.warning(
+                "Access denied: unauthenticated user",
+                resource=self.key,
+                action=self.action,
+                path=request.url.path,
+            )
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated"
             )
@@ -42,6 +51,14 @@ class RequirePermission:
         rule = result.scalar_one_or_none()
 
         if not rule:
+            logger.warning(
+                "Access denied: no RBAC rule found",
+                user_id=user.id,
+                role_id=user.role_id,
+                resource=self.key,
+                action=self.action,
+                path=request.url.path,
+            )
             # Если правил нет вообще - запрещено по умолчанию
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -61,15 +78,36 @@ class RequirePermission:
             case "delete":
                 is_allowed = rule.delete_permission or rule.delete_all_permission
             case _:
+                logger.error(
+                    "Unknown action in RequirePermission",
+                    action=self.action,
+                    resource=self.key,
+                )
                 # Если передан неизвестный экшен
                 raise HTTPException(
                     status_code=500, detail=f"Unknown action '{self.action}'"
                 )
 
         if not is_allowed:
+            logger.warning(
+                "Access denied: insufficient permissions",
+                user_id=user.id,
+                role_id=user.role_id,
+                resource=self.key,
+                action=self.action,
+                path=request.url.path,
+            )
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"You do not have permission to {self.action} {self.key}",
             )
+        logger.debug(
+            "Access granted",
+            user_id=user.id,
+            role_id=user.role_id,
+            resource=self.key,
+            action=self.action,
+            path=request.url.path,
+        )
 
         return True

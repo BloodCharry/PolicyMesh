@@ -2,6 +2,7 @@ import asyncio
 import logging
 
 import bcrypt
+import structlog
 from sqlalchemy import select
 
 from app.db.session import AsyncSessionLocal
@@ -9,8 +10,7 @@ from app.models.rbac import AccessRolesRules, BusinessElement, Role
 from app.models.users import User
 
 # логгер
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger()
 
 
 async def seed_db() -> None:
@@ -53,7 +53,7 @@ async def seed_db() -> None:
                 element = BusinessElement(key=el["key"], name=el["name"])
                 session.add(element)
                 await session.flush()
-                logger.info(f"Element created: {el['key']}")
+                logger.info("Business element created", key=el["key"], name=el["name"])
             else:
                 logger.info(f"Element exists: {el['key']}")
 
@@ -83,7 +83,9 @@ async def seed_db() -> None:
                     delete_all_permission=True,
                 )
                 session.add(rule)
-                logger.info(f"Added FULL rights for Admin on {key}")
+                logger.info("Full permissions granted to Admin", resource=key)
+            else:
+                logger.info("Admin permissions already exist", resource=key)
 
         # Правила для User (Ограниченные)
         user_role = roles_map["User"]
@@ -110,7 +112,9 @@ async def seed_db() -> None:
                 delete_all_permission=False,
             )
             session.add(rule)
-            logger.info("Added LIMITED rights for User on orders")
+            logger.info("Limited permissions granted to User", resource="orders")
+        else:
+            logger.info("User permissions already exist", resource="orders")
 
         # Создание АДМИНИСТРАТОРА
         admin_email = "admin@example.com"
@@ -118,7 +122,7 @@ async def seed_db() -> None:
         existing_admin = (await session.execute(stmt_user)).scalar_one_or_none()
 
         if not existing_admin:
-            password_bytes = b"admin123"
+            password_bytes = b"admin123"  # nosec  # noqa: S105
             salt = bcrypt.gensalt()
             hashed_password = bcrypt.hashpw(password_bytes, salt).decode("utf-8")
 
@@ -131,13 +135,35 @@ async def seed_db() -> None:
                 is_active=True,
             )
             session.add(admin_user)
-            logger.info(f"Superuser created: {admin_email} / admin123")
+            logger.info("Superuser created", email=admin_email)
         else:
-            logger.info("Superuser already exists")
+            logger.info("Superuser already exists", email=admin_email)
 
         await session.commit()
         logger.info("Seeding completed successfully!")
 
 
 if __name__ == "__main__":
+    import logging
+    import sys
+
+    logging.basicConfig(
+        format="%(message)s",
+        stream=sys.stdout,
+        level=logging.INFO,
+    )
+    structlog.configure(
+        processors=[
+            structlog.stdlib.filter_by_level,
+            structlog.stdlib.add_logger_name,
+            structlog.stdlib.add_log_level,
+            structlog.stdlib.PositionalArgumentsFormatter(),
+            structlog.processors.TimeStamper(fmt="iso"),
+            structlog.processors.JSONRenderer(),
+        ],
+        logger_factory=structlog.stdlib.LoggerFactory(),
+        wrapper_class=structlog.stdlib.BoundLogger,
+        cache_logger_on_first_use=True,
+    )
+
     asyncio.run(seed_db())

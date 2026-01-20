@@ -1,3 +1,4 @@
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,6 +8,8 @@ from app.db.session import get_db
 from app.models.rbac import AccessRolesRules, BusinessElement, Role
 from app.schemas.rbac import RuleRead, RuleUpdate
 
+logger = structlog.get_logger()
+
 router = APIRouter()
 
 
@@ -14,8 +17,17 @@ router = APIRouter()
 def check_admin_privileges(request: Request) -> None:
     user = request.state.user
     if not user:
+        logger.warning(
+            "Admin access denied: unauthenticated user", path=request.url.path
+        )
         raise HTTPException(status_code=401, detail="Not authenticated")
     if user.role.name != "Admin":
+        logger.warning(
+            "Admin access denied: insufficient privileges",
+            user_id=user.id,
+            role_name=user.role.name,
+            path=request.url.path,
+        )
         raise HTTPException(status_code=403, detail="Admins only")
 
 
@@ -29,6 +41,8 @@ async def get_all_rules(
     Получить список всех правил доступа.
     Показывает матрицу: Роль -> Элемент -> Права.
     """
+    user = request.state.user
+    logger.info("Admin requested all RBAC rules", admin_id=user.id)
     stmt = (
         select(AccessRolesRules)
         .options(
@@ -56,6 +70,9 @@ async def get_all_rules(
                 delete_all_permission=r.delete_all_permission,
             )
         )
+    logger.debug(
+        "RBAC rules retrieved successfully", admin_id=user.id, rule_count=len(response)
+    )
     return response
 
 
@@ -71,6 +88,13 @@ async def update_rule(
     """
     Обновить или создать права для конкретной роли на конкретный элемент.
     """
+    user = request.state.user
+    logger.info(
+        "Admin updating RBAC rule",
+        admin_id=user.id,
+        target_role=role_name,
+        target_element=element_key,
+    )
     # Поиск Роли и Элемена по имени
     role = (
         await db.execute(select(Role).where(Role.name == role_name))
@@ -82,6 +106,14 @@ async def update_rule(
     ).scalar_one_or_none()
 
     if not role or not element:
+        logger.warning(
+            "RBAC rule update failed: role or element not found",
+            admin_id=user.id,
+            target_role=role_name,
+            target_element=element_key,
+            role_found=bool(role),
+            element_found=bool(element),
+        )
         raise HTTPException(status_code=404, detail="Role or Element not found")
 
     # Поиск существующего правила
@@ -89,6 +121,8 @@ async def update_rule(
         AccessRolesRules.role_id == role.id, AccessRolesRules.element_id == element.id
     )
     rule = (await db.execute(stmt)).scalar_one_or_none()
+
+    is_new = False
 
     # Если правила нет - создать, если есть - обновить
     if not rule:
@@ -106,6 +140,14 @@ async def update_rule(
 
     await db.commit()
     await db.refresh(rule)
+
+    logger.info(
+        "RBAC rule updated successfully",
+        admin_id=user.id,
+        target_role=role_name,
+        target_element=element_key,
+        is_new=is_new,
+    )
 
     # Для ответа подгрузка связи
     return RuleRead(

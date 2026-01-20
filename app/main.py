@@ -1,5 +1,10 @@
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+
+import structlog
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
+from prometheus_fastapi_instrumentator import Instrumentator
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.api.v1 import admin, auth, mock, users
@@ -9,9 +14,27 @@ from app.core.exceptions import (
     http_exception_handler,
     validation_exception_handler,
 )
+from app.core.logging import setup_logging
 from app.middleware.authentication import AuthMiddleware
 
-app = FastAPI(title=settings.PROJECT_NAME)
+# Настройка логгера
+logger = structlog.get_logger()
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    # Startup
+    setup_logging(log_level="INFO")
+    logger.info("Startup application", project=settings.PROJECT_NAME)
+    yield
+    # Shutdown
+    logger.info("Shutdown application")
+
+
+app = FastAPI(title=settings.PROJECT_NAME, lifespan=lifespan)
+
+# Metrics Prometheus
+Instrumentator().instrument(app).expose(app)
 
 # Middleware
 app.add_middleware(AuthMiddleware)

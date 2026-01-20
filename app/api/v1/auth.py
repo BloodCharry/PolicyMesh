@@ -1,3 +1,4 @@
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,6 +10,8 @@ from app.schemas.auth import LoginRequest, TokenResponse
 from app.schemas.user import UserCreate, UserRead
 from app.services.auth_ops import AuthService
 
+logger = structlog.get_logger()
+
 router = APIRouter()
 
 
@@ -18,8 +21,10 @@ async def register(user_in: UserCreate, db: AsyncSession = Depends(get_db)) -> U
     Регистрация нового пользователя.
     По умолчанию выдаем роль 'User'.
     """
+    logger.info("Registration attempt", email=user_in.email)
     # Проверка паролей
     if user_in.password != user_in.password_confirm:
+        logger.warning("Password mismatch during registration", email=user_in.email)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Passwords do not match"
         )
@@ -27,6 +32,7 @@ async def register(user_in: UserCreate, db: AsyncSession = Depends(get_db)) -> U
     # Проверка уникальности email
     stmt = select(User).where(User.email == user_in.email)
     existing_user = (await db.execute(stmt)).scalar_one_or_none()
+    logger.warning("Email already registered", email=user_in.email)
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered"
@@ -37,6 +43,7 @@ async def register(user_in: UserCreate, db: AsyncSession = Depends(get_db)) -> U
     default_role = (await db.execute(role_stmt)).scalar_one_or_none()
 
     if not default_role:
+        logger.error("Default role 'User' not found in DB")
         # Fallback на случай если БД пустая
         raise HTTPException(
             status_code=500, detail="Default role 'User' not found in DB"
@@ -57,6 +64,9 @@ async def register(user_in: UserCreate, db: AsyncSession = Depends(get_db)) -> U
     db.add(new_user)
     await db.commit()
     await db.refresh(new_user)  # Подгружаем ID и другие поля из БД
+    logger.info(
+        "User registered successfully", user_id=new_user.id, email=new_user.email
+    )
 
     return UserRead.model_validate(new_user)
 
@@ -69,6 +79,7 @@ async def login(
     Вход в систему по Email/Password.
     Возвращает Access и Refresh токены.
     """
+    logger.info("Login attempt", email=login_data.email)
     # Поиск пользователя
     stmt = select(User).where(User.email == login_data.email)
     user = (await db.execute(stmt)).scalar_one_or_none()
@@ -77,6 +88,7 @@ async def login(
     if not user or not AuthService.verify_password(
         login_data.password, user.hashed_password
     ):
+        logger.warning("Invalid credentials", email=login_data.email)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect email or password",
@@ -84,6 +96,7 @@ async def login(
         )
 
     if not user.is_active:
+        logger.warning("Inactive user login attempt", user_id=user.id, email=user.email)
         raise HTTPException(status_code=400, detail="User is inactive")
 
     # Генерация токенов
@@ -92,6 +105,7 @@ async def login(
 
     access_token = AuthService.create_access_token(payload)
     refresh_token = AuthService.create_refresh_token(payload)
+    logger.info("User logged in successfully", user_id=user.id)
 
     return TokenResponse(access_token=access_token, refresh_token=refresh_token)
 

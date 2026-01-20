@@ -22,6 +22,9 @@ pydantic-settings = "^2.12.0"
 python-dotenv = "^1.2.1"
 bcrypt = "^5.0.0"
 pre-commit = "^4.5.1"
+gunicorn = "^23.0.0"
+structlog = "^25.5.0"
+prometheus-fastapi-instrumentator = "^7.1.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = ">=9.0.2,<10.0.0"
@@ -55,10 +58,10 @@ line-length = 88
 target-version = "py312"
 
 [tool.ruff.lint]
-select = ["E", "W", "F", "I", "B", "C4", "UP", "TCH"]
+select = ["E", "W", "F", "I", "B", "C4", "UP"]
 ignore = ["E501",
     "B008",
-    "TC001"]
+]
 fixable = ["ALL"]
 unfixable = []
 
@@ -80,3 +83,7 @@ warn_redundant_casts = true
 warn_unused_ignores = true
 show_error_codes = true
 pretty = true
+plugins = ["pydantic.mypy"]
+follow_imports = "silent"
+mypy_path = ["."]
+explicit_package_bases = true

@@ -1,0 +1,71 @@
+# Виртуальные окружения
+.venv/
+env/
+venv/
+
+# Кэш и временные файлы
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Логи и данные
+logs/
+*.log
+*.tmp
+
+# Системные файлы
+.DS_Store
+Thumbs.db
+
+# IDE и редакторы
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Git
+.git/
+.gitignore
+
+# Тесты (если не нужны в продакшене)
+tests/
+conftest.py
+
+# Документация
+docs/
+DECISIONS.md
+
+# Конфигурация локальной разработки
+.env
+.env.dev
+.env.prod
+.env.example
+.env.dev.example
+.env.prod.example
+
+# Docker-compose файлы
+docker-compose.yml
+docker-compose-*.yml
+docker/
+
+# Makefile и скрипты
+Makefile
+scripts/
+
+# Poetry
+poetry.lock
+# НО! pyproject.toml НУЖЕН для установки зависимостей
+
+# Pre-commit
+.pre-commit-config.yaml
+.pre-commit/
+
+# Мусор Windows
+Desktop.ini

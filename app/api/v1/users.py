@@ -1,8 +1,11 @@
+import structlog
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
 from app.schemas.user import UserRead
+
+logger = structlog.get_logger()
 
 router = APIRouter()
 
@@ -15,10 +18,14 @@ async def read_profile(request: Request) -> UserRead:
     user = getattr(request.state, "user", None)
 
     if not user:
+        logger.warning(
+            "Profile access denied: unauthenticated user", path=request.url.path
+        )
         # Если Middleware не отработал или токен невалиден
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required"
         )
+    logger.debug("User profile retrieved", user_id=user.id)
 
     return UserRead.model_validate(user)
 
@@ -31,6 +38,10 @@ async def delete_profile(request: Request, db: AsyncSession = Depends(get_db)) -
     user = getattr(request.state, "user", None)
 
     if not user:
+        logger.warning(
+            "Profile deletion denied: unauthenticated user", path=request.url.path
+        )
+
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required"
         )
@@ -41,4 +52,9 @@ async def delete_profile(request: Request, db: AsyncSession = Depends(get_db)) -
     db.add(user)
     await db.commit()
 
+    logger.info(
+        "User profile soft-deleted",
+        user_id=user.id,
+        email=getattr(user, "email", "unknown"),
+    )
     return None
